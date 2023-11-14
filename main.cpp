@@ -5,6 +5,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <random>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -18,7 +19,8 @@
 #define FRAME_RATE 30
 
 const int BALL_N = 10;
-
+cv::Mat frame, sobeled_frame, output_frame;
+cv::VideoCapture cap;
 void initGL(int argc, char *argv[]);
 void init();
 void setCallbackFunctions();
@@ -29,27 +31,45 @@ void glutIdle();
 void drawBackground();
 
 GLuint g_TextureHandles[3] = {0, 0, 0};
+double g_angle1 = 0.0;
+double g_angle2 = -3.141592 / 8;
+double g_distance = 5.0;
+std::mt19937 engine;
+std::uniform_real_distribution<float> ran(-1.0f, 1.0f);
 
+void drawOutlines(cv::Mat &img);
 class Ball {
 public:
-  double x, y, r, vx, vy, dt, g;
+  const double GROUND_Z = 0.1;
+  double x, y, z, r, vx, vy, vz, dt, g;
   int color_r, touching_frame;
-  bool is_touching, is_dead;
+  bool is_touching, is_dead, on_ground;
+  double initial_x, initial_y;
   Ball()
-      : x(0), y(0), vy(0), r(0.03), color_r(1.0), dt(0.005), g(9.8),
-        is_touching(false), is_dead(false) {}
+      : x(0), y(-0.5), z(3.0), vy(0), vz(0), r(0.03), color_r(1.0), dt(0.005),
+        g(9.8), is_touching(false), is_dead(false), on_ground(false) {
+    x = ran(engine);
+    y = (ran(engine) - 1.0) / 2.0;
+  }
   void drawBall() {
     if (is_dead)
       return;
     updatePos();
     updateColor();
-    const int n = 20;
-    glBegin(GL_POLYGON);
-    glColor3d(color_r, 1.0, 1.0);
-    for (int i = 0; i < n; i++) {
-      glVertex2d(x + r * cos((double)i * 2.0 * M_PI / n),
-                 y + r * sin((double)i * 2.0 * M_PI / n));
-    }
+    /* const int n = 20;
+     glBegin(GL_POLYGON);
+     glColor3d(color_r, 1.0, 1.0);
+     for (int i = 0; i < n; i++) {
+       glVertex3d(x + r * cos((double)i * 2.0 * M_PI / n),
+                  y + r * sin((double)i * 2.0 * M_PI / n), z);
+     }*/
+    //球
+    glPushMatrix();
+    glColor3d(color_r, 1.0, 1.0); //色の設定
+    glTranslated(x, y, z);        //平行移動値の設定
+    glutSolidSphere(r, 20,
+                    20); //引数：(半径, Z軸まわりの分割数, Z軸に沿った分割数)
+    glPopMatrix();
     glEnd();
   }
   void updateY() {}
@@ -70,6 +90,8 @@ public:
     x = std::max(x, -1.0);
   }
   bool checkTouching(cv::Mat &img) {
+    if (!on_ground)
+      return false;
     is_touching = false;
     for (int i = -5; i < 5; i++) {
       for (int j = -5; j < 5; j++) {
@@ -104,10 +126,19 @@ public:
     }
   }
   void updatePos() {
-    y += dt * vy;
-    vy -= dt * g;
-    if (y < -1) {
-      is_dead = true;
+    if (on_ground) {
+      y -= dt * vy;
+      vy -= dt * g;
+      if (y < -1 || y > 1) {
+        is_dead = true;
+      }
+    } else {
+      z -= dt * vz;
+      vz += dt * g;
+      if (z <= GROUND_Z) {
+        std::cerr << "on_ground" << std::endl;
+        on_ground = true;
+      }
     }
   }
 } ball[BALL_N];
@@ -149,12 +180,14 @@ int main(int argc, char *argv[]) {
 
 void initGL(int argc, char *argv[]) {
   glutInit(&argc, argv);
-  glutInitDisplayMode(GLUT_RGBA);
+  glutInitDisplayMode(GLUT_RGBA | GLUT_DEPTH | GLUT_DOUBLE);
   glutInitWindowSize(WINDOW_X, WINDOW_Y);
   glutCreateWindow(WINDOW_NAME);
 }
 
 void init() {
+  std::random_device seed_gen;
+  engine.seed(seed_gen());
   glClearColor(0.2, 0.2, 0.2, 0.2);
   glGenTextures(3, g_TextureHandles);
   cap.open(0, cv::CAP_V4L2);
@@ -212,11 +245,27 @@ char txt[20];
 
 void glutDisplay() {
   if (game.state == State::PLAY) {
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(30.0, 1.0, 0.1, 100);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    gluLookAt(g_distance * cos(g_angle2) * sin(g_angle1),
+              g_distance * sin(g_angle2),
+              g_distance * cos(g_angle2) * cos(g_angle1), 0.0, 0.0, 0.0, 0.0,
+              1.0, 0.0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
     drawBackground();
     ball[game.ball_id].drawBall();
+    drawOutlines(output_frame);
+    glFlush();
+    glDisable(GL_DEPTH_TEST);
+
+    glutSwapBuffers();
   }
   // drawBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, txt);
-  glFlush();
 }
 
 void glutIdle() {
@@ -231,8 +280,8 @@ void glutIdle() {
     edgeExtract(frame, output_frame);
     ball[game.ball_id].checkTouching(output_frame);
     glBindTexture(GL_TEXTURE_2D, g_TextureHandles[0]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, output_frame.cols, output_frame.rows,
-                 0, GL_BGR, GL_UNSIGNED_BYTE, output_frame.data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.cols, frame.rows, 0, GL_BGR,
+                 GL_UNSIGNED_BYTE, frame.data);
     // int k = cv::waitKey(33);
     if (ball[game.ball_id].is_dead) {
       game.ball_id++;
@@ -255,17 +304,35 @@ void drawBackground() {
 
   // glColor3d(1.0, 0.0, 0.0);
   glTexCoord2d(0.0, 1.0);
-  glVertex2d(-0.9, -0.9);
+  glVertex3d(-1.0, -1.0, 0.0);
   // glColor3d(1.0, 1.0, 0.0);
   glTexCoord2d(1.0, 1.0);
-  glVertex2d(0.9, -0.9);
+  glVertex3d(1.0, -1.0, 0.0);
   // glColor3d(0.0, 1.0, 1.0);
   glTexCoord2d(1.0, 0.0);
-  glVertex2d(0.9, 0.9);
+  glVertex3d(1.0, 1.0, 0.0);
   // glColor3d(0.0, 0.0, 0.0);
   glTexCoord2d(0.0, 0.0);
-  glVertex2d(-0.9, 0.9);
+  glVertex3d(-1.0, 1.0, 0.0);
 
   glEnd();
   glDisable(GL_TEXTURE_2D);
+}
+
+void drawOutlines(cv::Mat &img) {
+  glLineWidth(10.0);
+  for (int y = 0; y < img.rows; y++) {
+    cv::Vec3b *src = img.ptr<cv::Vec3b>(y);
+    double ny = 1.0 - 2.0 * y / img.rows;
+    for (int x = 0; x < img.cols; x++) {
+      int b = src[x][0];
+      if (b > 0) {
+        double nx = 2.0 * x / img.cols - 1.0;
+        glBegin(GL_LINES);
+        glVertex3f(nx, ny, 0);
+        glVertex3f(nx, ny, 0.3);
+        glEnd();
+      }
+    }
+  }
 }

@@ -9,3 +9,6 @@ $(PRG) : $(OBJ)
 
 .c.o:
 	$(CXX) $(CXXFLAGS) -c $^
+
+clean: 
+	rm *.o
