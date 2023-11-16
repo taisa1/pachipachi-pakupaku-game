@@ -1,5 +1,11 @@
 #include "cv.hpp"
 #include <GL/glut.h>
+#include <dlib/gui_widgets.h>
+#include <dlib/image_io.h>
+#include <dlib/image_processing.h>
+#include <dlib/image_processing/frontal_face_detector.h>
+#include <dlib/opencv.h>
+#include <dlib/opencv/cv_image.h>
 #include <iostream>
 #include <math.h>
 #include <opencv2/core/core.hpp>
@@ -32,11 +38,12 @@ void drawBackground();
 
 GLuint g_TextureHandles[3] = {0, 0, 0};
 double g_angle1 = 0.0;
-double g_angle2 = -3.141592 / 8;
+double g_angle2 = 0;
 double g_distance = 5.0;
 std::mt19937 engine;
 std::uniform_real_distribution<float> ran(-1.0f, 1.0f);
-
+dlib::frontal_face_detector detector;
+dlib::shape_predictor predictor;
 void drawOutlines(cv::Mat &img);
 class Ball {
 public:
@@ -143,6 +150,52 @@ public:
   }
 } ball[BALL_N];
 
+class Mouth {
+public:
+  const std::vector<int> upper_mouth = {50, 51, 52, 53, 54, 62, 63, 64};
+  const std::vector<int> lower_mouth = {56, 57, 58, 59, 60, 66, 67, 68};
+  float center_x, center_y;
+  bool is_open;
+  dlib::full_object_detection shape;
+  void updatePos() {
+    center_x = 0;
+    center_y = 0;
+    float upper_mean = 0;
+    float lower_mean = 0;
+    for (auto i : upper_mouth) {
+      center_x += shape.part(i).x();
+      center_y += shape.part(i).y();
+      upper_mean += shape.part(i).y();
+    }
+    upper_mean /= upper_mouth.size();
+    for (auto i : upper_mouth) {
+      center_x += shape.part(i).x();
+      center_y += shape.part(i).y();
+      lower_mean += shape.part(i).y();
+    }
+    lower_mean /= lower_mouth.size();
+    center_x /= upper_mouth.size() + lower_mouth.size();
+    center_y /= upper_mouth.size() + lower_mouth.size();
+    is_open = (upper_mean - lower_mean > 3);
+  }
+  void display() {
+    for (int i : upper_mouth) {
+      int x = shape.part(i).x();
+      int y = shape.part(i).y();
+      cv::circle(frame, cv::Point(x, y), 2,
+                 is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), -1);
+    }
+    for (int i : lower_mouth) {
+      int x = shape.part(i).x();
+      int y = shape.part(i).y();
+      cv::circle(frame, cv::Point(x, y), 2,
+                 is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), -1);
+    }
+    cv::putText(frame, is_open ? "Mouth Open" : "Mouth Closed",
+                cv::Point(50, 50), cv::FONT_HERSHEY_SIMPLEX, 1,
+                is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), 2);
+  }
+} mouth;
 enum State { TITLE, PLAY, RESULT };
 
 class gameState {
@@ -188,6 +241,10 @@ void initGL(int argc, char *argv[]) {
 void init() {
   std::random_device seed_gen;
   engine.seed(seed_gen());
+  detector = dlib::get_frontal_face_detector();
+  dlib::deserialize("/home/denjo/opencv/facial-landmarks-recognition/"
+                    "shape_predictor_68_face_landmarks.dat") >>
+      predictor;
   glClearColor(0.2, 0.2, 0.2, 0.2);
   glGenTextures(3, g_TextureHandles);
   cap.open(0, cv::CAP_V4L2);
@@ -207,6 +264,15 @@ void init() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   }
   cap >> frame;
+  dlib::cv_image<dlib::bgr_pixel> cimg(frame);
+  std::cerr << "loaded" << std::endl;
+  std::vector<dlib::rectangle> faces = detector(cimg);
+  std::cerr << "detected" << std::endl;
+  mouth.shape = predictor(cimg, faces[0]);
+  std::cerr << "predicted" << std::endl;
+  mouth.updatePos();
+  std::cerr << mouth.center_x << " " << mouth.center_y << std::endl;
+  std::cerr << mouth.is_open << std::endl;
   edgeExtract(frame, output_frame);
   glBindTexture(GL_TEXTURE_2D, g_TextureHandles[0]);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, output_frame.cols, output_frame.rows,
@@ -276,6 +342,17 @@ void glutIdle() {
       printf("no frame\n");
       return;
     }
+    dlib::cv_image<dlib::bgr_pixel> cimg(frame);
+    std::cerr << "loaded" << std::endl;
+    std::vector<dlib::rectangle> faces = detector(cimg);
+    std::cerr << "detected" << std::endl;
+    mouth.shape = predictor(cimg, faces[0]);
+    std::cerr << "predicted" << std::endl;
+    mouth.updatePos();
+    std::cerr << mouth.center_x << " " << mouth.center_y << std::endl;
+    std::cerr << mouth.is_open << std::endl;
+    //   mouth.display();
+
     // convertColorToGray(frame, output_frame);
     edgeExtract(frame, output_frame);
     ball[game.ball_id].checkTouching(output_frame);
