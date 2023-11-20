@@ -111,44 +111,71 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named mouth
+# Target rules for targets named main
 
 # Build rule for target.
-mouth: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 mouth
-.PHONY : mouth
+main: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 main
+.PHONY : main
 
 # fast build rule for target.
-mouth/fast:
-	$(MAKE) -f CMakeFiles/mouth.dir/build.make CMakeFiles/mouth.dir/build
-.PHONY : mouth/fast
+main/fast:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/build
+.PHONY : main/fast
 
-mouth.o: mouth.cpp.o
+cv.o: cv.cpp.o
 
-.PHONY : mouth.o
+.PHONY : cv.o
 
 # target to build an object file
-mouth.cpp.o:
-	$(MAKE) -f CMakeFiles/mouth.dir/build.make CMakeFiles/mouth.dir/mouth.cpp.o
-.PHONY : mouth.cpp.o
+cv.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/cv.cpp.o
+.PHONY : cv.cpp.o
 
-mouth.i: mouth.cpp.i
+cv.i: cv.cpp.i
 
-.PHONY : mouth.i
+.PHONY : cv.i
 
 # target to preprocess a source file
-mouth.cpp.i:
-	$(MAKE) -f CMakeFiles/mouth.dir/build.make CMakeFiles/mouth.dir/mouth.cpp.i
-.PHONY : mouth.cpp.i
+cv.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/cv.cpp.i
+.PHONY : cv.cpp.i
 
-mouth.s: mouth.cpp.s
+cv.s: cv.cpp.s
 
-.PHONY : mouth.s
+.PHONY : cv.s
 
 # target to generate assembly for a file
-mouth.cpp.s:
-	$(MAKE) -f CMakeFiles/mouth.dir/build.make CMakeFiles/mouth.dir/mouth.cpp.s
-.PHONY : mouth.cpp.s
+cv.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/cv.cpp.s
+.PHONY : cv.cpp.s
+
+main.o: main.cpp.o
+
+.PHONY : main.o
+
+# target to build an object file
+main.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main.cpp.o
+.PHONY : main.cpp.o
+
+main.i: main.cpp.i
+
+.PHONY : main.i
+
+# target to preprocess a source file
+main.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main.cpp.i
+.PHONY : main.cpp.i
+
+main.s: main.cpp.s
+
+.PHONY : main.s
+
+# target to generate assembly for a file
+main.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main.cpp.s
+.PHONY : main.cpp.s
 
 # Help Target
 help:
@@ -158,10 +185,13 @@ help:
 	@echo "... depend"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
-	@echo "... mouth"
-	@echo "... mouth.o"
-	@echo "... mouth.i"
-	@echo "... mouth.s"
+	@echo "... main"
+	@echo "... cv.o"
+	@echo "... cv.i"
+	@echo "... cv.s"
+	@echo "... main.o"
+	@echo "... main.i"
+	@echo "... main.s"
 .PHONY : help
 
 

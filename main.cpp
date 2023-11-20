@@ -1,5 +1,6 @@
 #include "cv.hpp"
 #include <GL/glut.h>
+#include <chrono>
 #include <dlib/gui_widgets.h>
 #include <dlib/image_io.h>
 #include <dlib/image_processing.h>
@@ -24,7 +25,16 @@
 #define FRAME_HEIGHT 480
 #define FRAME_RATE 30
 
-const int BALL_N = 10;
+using namespace std::chrono;
+std::chrono::system_clock::time_point start;
+inline double get_time_sec() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::system_clock::now() - start)
+             .count() /
+         1000.0;
+}
+
+const int Item_N = 30;
 cv::Mat frame, sobeled_frame, output_frame;
 cv::VideoCapture cap;
 void initGL(int argc, char *argv[]);
@@ -38,27 +48,116 @@ void drawBackground();
 
 GLuint g_TextureHandles[3] = {0, 0, 0};
 double g_angle1 = 0.0;
-double g_angle2 = 0;
+double g_angle2 = -3.14 / 3;
 double g_distance = 5.0;
 std::mt19937 engine;
 std::uniform_real_distribution<float> ran(-1.0f, 1.0f);
 dlib::frontal_face_detector detector;
 dlib::shape_predictor predictor;
 void drawOutlines(cv::Mat &img);
-class Ball {
+
+class Mouth {
+public:
+  const std::vector<int> upper_mouth = {50, 51, 52, 53, 54, 62, 63, 64};
+  const std::vector<int> lower_mouth = {56, 57, 58, 59, 60, 66, 67, 68};
+  const std::vector<int> left_eye = {36, 37, 38, 39, 40, 41};
+  const std::vector<int> right_eye = {42, 43, 44, 45, 46, 47};
+  float center_x, center_y, radius, eyel_center_x, eyer_center_x, eyel_center_y,
+      eyer_center_y, eye_radius;
+  bool is_open;
+  int no_detected_frame;
+  dlib::full_object_detection shape;
+  Mouth()
+      : center_x(0), center_y(0), is_open(false), no_detected_frame(0),
+        radius(100), eye_radius(50) {}
+  void updatePos() {
+    center_x = 0;
+    center_y = 0;
+    eyel_center_x = 0;
+    eyel_center_y = 0;
+    eyer_center_x = 0;
+    eyer_center_y = 0;
+    float upper_mean = 0;
+    float lower_mean = 0;
+    for (auto i : upper_mouth) {
+      center_x += shape.part(i).x();
+      center_y += shape.part(i).y();
+      // std::cerr << shape.part(i).x() << " " << shape.part(i).y() <<
+      // std::endl;
+      upper_mean += shape.part(i).y();
+    }
+    upper_mean /= upper_mouth.size();
+    for (auto i : lower_mouth) {
+      center_x += shape.part(i).x();
+      center_y += shape.part(i).y();
+      lower_mean += shape.part(i).y();
+    }
+    lower_mean /= lower_mouth.size();
+    center_x /= upper_mouth.size() + lower_mouth.size();
+    center_y /= upper_mouth.size() + lower_mouth.size();
+    //   std::cerr << upper_mean << " " << lower_mean << std::endl;
+    is_open = (upper_mean - lower_mean > 1.5);
+    for (auto i : left_eye) {
+      eyel_center_x += shape.part(i).x();
+      eyel_center_y += shape.part(i).y();
+    }
+    eyel_center_x /= left_eye.size();
+    eyel_center_y /= left_eye.size();
+    for (auto i : right_eye) {
+      eyer_center_x += shape.part(i).x();
+      eyer_center_y += shape.part(i).y();
+    }
+    eyer_center_x /= right_eye.size();
+    eyer_center_y /= right_eye.size();
+  }
+  void display() {
+    /* for (int i : upper_mouth) {
+       int x = shape.part(i).x();
+       int y = shape.part(i).y();
+       cv::circle(frame, cv::Point(x, y), 2,
+                  is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255),
+     -1);
+     }
+     for (int i : lower_mouth) {
+       int x = shape.part(i).x();
+       int y = shape.part(i).y();
+       cv::circle(frame, cv::Point(x, y), 2,
+                  is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255),
+     -1);
+     }*/
+    cv::circle(frame, cv::Point(center_x, center_y), radius,
+               is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), -1);
+    cv::circle(frame, cv::Point(eyel_center_x, eyel_center_y), 50,
+               is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), -1);
+    cv::circle(frame, cv::Point(eyer_center_x, eyer_center_y), 50,
+               is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), -1);
+    /*cv::putText(frame, is_open ? "Mouth Open" : "Mouth Closed",
+                cv::Point(50, 50), cv::FONT_HERSHEY_SIMPLEX, 1,
+                is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), 2);*/
+  }
+} mouth;
+enum ItemType { BALL, STAR };
+class Item {
 public:
   const double GROUND_Z = 0.1;
+  ItemType type;
   double x, y, z, r, vx, vy, vz, dt, g;
-  int color_r, touching_frame;
+  int color_r, color_g, color_b, touching_frame;
   bool is_touching, is_dead, on_ground;
   double initial_x, initial_y;
-  Ball()
-      : x(0), y(-0.5), z(3.0), vy(0), vz(0), r(0.03), color_r(1.0), dt(0.005),
-        g(9.8), is_touching(false), is_dead(false), on_ground(false) {
-    x = ran(engine);
-    y = (ran(engine) - 1.0) / 2.0;
+  Item()
+      : x(0), y(-0.5), z(2.0), vy(0), vz(10.0), r(0.03), color_r(1.0),
+        dt(0.005), g(9.8 * 5), is_touching(false), is_dead(false),
+        on_ground(false) {
+    x = ran(engine)/2.0;
+    y = (ran(engine) - 1.0) / 4.0;
+    if (ran(engine) > 0.0) {
+      type = BALL;
+    } else {
+      type = STAR;
+    }
   }
-  void drawBall() {
+  void drawItem() {
     if (is_dead)
       return;
     updatePos();
@@ -72,8 +171,12 @@ public:
      }*/
     //球
     glPushMatrix();
-    glColor3d(color_r, 1.0, 1.0); //色の設定
-    glTranslated(x, y, z);        //平行移動値の設定
+    if (type == STAR) {
+      glColor3d(1.0, 1.0, 0.0); //色の設定
+    } else {
+      glColor3d(0.0, 1.0, 0.0);
+    }
+    glTranslated(x, y, z); //平行移動値の設定
     glutSolidSphere(r, 20,
                     20); //引数：(半径, Z軸まわりの分割数, Z軸に沿った分割数)
     glPopMatrix();
@@ -109,10 +212,37 @@ public:
         int intensity = img.at<cv::Vec3b>(ny, nx)[0];
         // std::cerr << ny << " " << nx << " " << intensity << std::endl;
 
-        if (intensity > 0) {
+        if (intensity > 254) {
           is_touching = true;
           // std::cerr << ny << " " << nx << " " << intensity << std::endl;
         }
+      }
+    }
+    return is_touching;
+  }
+  bool checkTouching(Mouth &m, cv::Mat &img) {
+    if (!on_ground)
+      return false;
+    is_touching = false;
+    int ny = static_cast<int>((1.0 - y) * img.rows / 2.0);
+    int nx = static_cast<int>((1.0 + x) * img.cols / 2.0);
+    if (type == BALL && m.center_y - m.radius <= ny &&
+        ny <= m.center_y + m.radius && m.center_x - m.radius <= nx &&
+        nx <= m.center_x + m.radius) {
+      is_touching = true;
+    }
+    if (type == STAR) {
+      if (m.eyel_center_y - m.eye_radius <= ny &&
+          ny <= m.eyel_center_y + m.eye_radius &&
+          m.eyel_center_x - m.eye_radius <= nx &&
+          nx <= m.eyel_center_x + m.eye_radius) {
+        is_touching = true;
+      }
+      if (m.eyer_center_y - m.eye_radius <= ny &&
+          ny <= m.eyer_center_y + m.eye_radius &&
+          m.eyer_center_x - m.eye_radius <= nx &&
+          nx <= m.eyer_center_x + m.eye_radius) {
+        is_touching = true;
       }
     }
     if (is_touching) {
@@ -134,75 +264,29 @@ public:
   }
   void updatePos() {
     if (on_ground) {
-      y -= dt * vy;
-      vy -= dt * g;
-      if (y < -1 || y > 1) {
-        is_dead = true;
-      }
+      //  y -= dt * vy;
+      // vy -= dt * g;
+      //   if (y < -1 || y > 1) {
+      // is_dead = true;
+      // }
     } else {
       z -= dt * vz;
-      vz += dt * g;
       if (z <= GROUND_Z) {
         std::cerr << "on_ground" << std::endl;
         on_ground = true;
       }
     }
   }
-} ball[BALL_N];
+} item[Item_N];
 
-class Mouth {
-public:
-  const std::vector<int> upper_mouth = {50, 51, 52, 53, 54, 62, 63, 64};
-  const std::vector<int> lower_mouth = {56, 57, 58, 59, 60, 66, 67, 68};
-  float center_x, center_y;
-  bool is_open;
-  dlib::full_object_detection shape;
-  void updatePos() {
-    center_x = 0;
-    center_y = 0;
-    float upper_mean = 0;
-    float lower_mean = 0;
-    for (auto i : upper_mouth) {
-      center_x += shape.part(i).x();
-      center_y += shape.part(i).y();
-      upper_mean += shape.part(i).y();
-    }
-    upper_mean /= upper_mouth.size();
-    for (auto i : upper_mouth) {
-      center_x += shape.part(i).x();
-      center_y += shape.part(i).y();
-      lower_mean += shape.part(i).y();
-    }
-    lower_mean /= lower_mouth.size();
-    center_x /= upper_mouth.size() + lower_mouth.size();
-    center_y /= upper_mouth.size() + lower_mouth.size();
-    is_open = (upper_mean - lower_mean > 3);
-  }
-  void display() {
-    for (int i : upper_mouth) {
-      int x = shape.part(i).x();
-      int y = shape.part(i).y();
-      cv::circle(frame, cv::Point(x, y), 2,
-                 is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), -1);
-    }
-    for (int i : lower_mouth) {
-      int x = shape.part(i).x();
-      int y = shape.part(i).y();
-      cv::circle(frame, cv::Point(x, y), 2,
-                 is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), -1);
-    }
-    cv::putText(frame, is_open ? "Mouth Open" : "Mouth Closed",
-                cv::Point(50, 50), cv::FONT_HERSHEY_SIMPLEX, 1,
-                is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), 2);
-  }
-} mouth;
 enum State { TITLE, PLAY, RESULT };
 
 class gameState {
 public:
-  int ball_id;
+  size_t item_id;
+  int score;
   State state;
-  gameState() : ball_id(0), state(State::PLAY) {}
+  gameState() : item_id(0), state(State::PLAY), score(0) {}
 } game;
 
 void drawBitmapString(void *font, char *string) {
@@ -237,6 +321,7 @@ void initGL(int argc, char *argv[]) {
   glutInitWindowSize(WINDOW_X, WINDOW_Y);
   glutCreateWindow(WINDOW_NAME);
 }
+double prev_time;
 
 void init() {
   std::random_device seed_gen;
@@ -263,21 +348,18 @@ void init() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   }
-  cap >> frame;
-  dlib::cv_image<dlib::bgr_pixel> cimg(frame);
-  std::cerr << "loaded" << std::endl;
-  std::vector<dlib::rectangle> faces = detector(cimg);
-  std::cerr << "detected" << std::endl;
-  mouth.shape = predictor(cimg, faces[0]);
-  std::cerr << "predicted" << std::endl;
-  mouth.updatePos();
-  std::cerr << mouth.center_x << " " << mouth.center_y << std::endl;
-  std::cerr << mouth.is_open << std::endl;
-  edgeExtract(frame, output_frame);
-  glBindTexture(GL_TEXTURE_2D, g_TextureHandles[0]);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, output_frame.cols, output_frame.rows,
-               0, GL_BGR, GL_UNSIGNED_BYTE, output_frame.data);
+  /* cap >> frame;
+   dlib::cv_image<dlib::bgr_pixel> cimg(frame);
+   std::vector<dlib::rectangle> faces = detector(cimg);
+   mouth.shape = predictor(cimg, faces[0]);
+   mouth.updatePos();
+   edgeExtract(frame, output_frame);
+   glBindTexture(GL_TEXTURE_2D, g_TextureHandles[0]);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, output_frame.cols,
+   output_frame.rows, 0, GL_BGR, GL_UNSIGNED_BYTE, output_frame.data);*/
   // set_texture();
+  start = std::chrono::system_clock::now();
+  prev_time = get_time_sec();
 }
 
 void setCallbackFunctions() {
@@ -289,16 +371,16 @@ void setCallbackFunctions() {
 void glutKeyboard(unsigned char key, int x, int y) {
   switch (key) {
   /*case 'w':
-    ball.up();
+    item.up();
     break;
   case 'a':
-    ball.left();
+    item.left();
     break;
   case 's':
-    ball.down();
+    item.down();
     break;
   case 'd':
-    ball.right();
+    item.right();
     break;*/
   case 'q':
   case 'Q':
@@ -324,8 +406,10 @@ void glutDisplay() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     drawBackground();
-    ball[game.ball_id].drawBall();
-    drawOutlines(output_frame);
+    for (size_t i = 0; i < game.item_id; i++) {
+      item[i].drawItem();
+    }
+    // drawOutlines(output_frame);
     glFlush();
     glDisable(GL_DEPTH_TEST);
 
@@ -342,33 +426,46 @@ void glutIdle() {
       printf("no frame\n");
       return;
     }
+    cv::flip(frame, frame, 1);
     dlib::cv_image<dlib::bgr_pixel> cimg(frame);
-    std::cerr << "loaded" << std::endl;
+    //   std::cerr << "loaded" << std::endl;
     std::vector<dlib::rectangle> faces = detector(cimg);
-    std::cerr << "detected" << std::endl;
-    mouth.shape = predictor(cimg, faces[0]);
-    std::cerr << "predicted" << std::endl;
-    mouth.updatePos();
-    std::cerr << mouth.center_x << " " << mouth.center_y << std::endl;
-    std::cerr << mouth.is_open << std::endl;
+    //   std::cerr << "detected" << std::endl;
+    if (!faces.empty()) {
+      mouth.no_detected_frame = 0;
+      mouth.shape = predictor(cimg, faces[0]);
+      mouth.updatePos();
+      mouth.display();
+    } else {
+      mouth.no_detected_frame++;
+      if (mouth.no_detected_frame > 10) {
+        std::cerr << "cannot detect mouth" << std::endl;
+      } else {
+        mouth.display();
+      }
+    }
+    // std::cerr << "predicted" << std::endl;
+
+    // std::cerr << mouth.center_x << " " << mouth.center_y << std::endl;
+    // std::cerr << mouth.is_open << std::endl;
     //   mouth.display();
 
     // convertColorToGray(frame, output_frame);
-    edgeExtract(frame, output_frame);
-    ball[game.ball_id].checkTouching(output_frame);
+    // edgeExtract(frame, output_frame);
+    double cur_time = get_time_sec();
+    if (game.item_id + 1 < Item_N && prev_time + 2.0 < cur_time) {
+      prev_time += 2.0;
+      std::cerr << cur_time << std::endl;
+      game.item_id++;
+    }
+    for (int i = 0; i < game.item_id; i++) {
+      item[i].checkTouching(mouth, frame);
+    }
     glBindTexture(GL_TEXTURE_2D, g_TextureHandles[0]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.cols, frame.rows, 0, GL_BGR,
                  GL_UNSIGNED_BYTE, frame.data);
     // int k = cv::waitKey(33);
-    if (ball[game.ball_id].is_dead) {
-      game.ball_id++;
-      std::cerr << "ball_id = " << game.ball_id << std::endl;
-    }
-    if (game.ball_id >= BALL_N) {
-      game.state = State::RESULT;
-      // std::cerr << "result" << std::endl;
-    }
-    sprintf(txt, "ball_id = %d", game.ball_id);
+    sprintf(txt, "item_id = %ld", game.item_id);
   } else if (game.state == State::RESULT) {
     //  std::cerr << "result" << std::endl;
   }
@@ -378,6 +475,7 @@ void glutIdle() {
 void drawBackground() {
   glEnable(GL_TEXTURE_2D);
   glBegin(GL_POLYGON);
+  glColor3d(1.0, 1.0, 1.0); //色の設定
 
   // glColor3d(1.0, 0.0, 0.0);
   glTexCoord2d(0.0, 1.0);
