@@ -7,6 +7,7 @@
 
 void convertColorToGray(cv::Mat &input, cv::Mat &processed);
 void edgeExtract(cv::Mat &input, cv::Mat &processed);
+void brighter(cv::Mat &img);
 
 #define CV_HPP
 #endif

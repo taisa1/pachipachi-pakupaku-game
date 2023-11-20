@@ -150,6 +150,60 @@ cv.cpp.s:
 	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/cv.cpp.s
 .PHONY : cv.cpp.s
 
+face.o: face.cpp.o
+
+.PHONY : face.o
+
+# target to build an object file
+face.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/face.cpp.o
+.PHONY : face.cpp.o
+
+face.i: face.cpp.i
+
+.PHONY : face.i
+
+# target to preprocess a source file
+face.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/face.cpp.i
+.PHONY : face.cpp.i
+
+face.s: face.cpp.s
+
+.PHONY : face.s
+
+# target to generate assembly for a file
+face.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/face.cpp.s
+.PHONY : face.cpp.s
+
+item.o: item.cpp.o
+
+.PHONY : item.o
+
+# target to build an object file
+item.cpp.o:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/item.cpp.o
+.PHONY : item.cpp.o
+
+item.i: item.cpp.i
+
+.PHONY : item.i
+
+# target to preprocess a source file
+item.cpp.i:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/item.cpp.i
+.PHONY : item.cpp.i
+
+item.s: item.cpp.s
+
+.PHONY : item.s
+
+# target to generate assembly for a file
+item.cpp.s:
+	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/item.cpp.s
+.PHONY : item.cpp.s
+
 main.o: main.cpp.o
 
 .PHONY : main.o
@@ -189,6 +243,12 @@ help:
 	@echo "... cv.o"
 	@echo "... cv.i"
 	@echo "... cv.s"
+	@echo "... face.o"
+	@echo "... face.i"
+	@echo "... face.s"
+	@echo "... item.o"
+	@echo "... item.i"
+	@echo "... item.s"
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"

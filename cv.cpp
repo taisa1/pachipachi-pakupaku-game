@@ -15,3 +15,14 @@ void edgeExtract(cv::Mat &input, cv::Mat &processed) {
   cv::Canny(grayscaled, processed, 50, 100);
   cv::cvtColor(processed, processed, cv::COLOR_GRAY2RGB);
 }
+
+void brighter(cv::Mat &img) {
+  for (int y = 0; y < img.rows; y++) {
+    cv::Vec3b *src = img.ptr<cv::Vec3b>(y);
+    for (int x = 0; x < img.cols; x++) {
+      for (int c = 0; c < img.channels(); c++) {
+        src[x][c] = cv::saturate_cast<uchar>(src[x][c] + 100);
+      }
+    }
+  }
+}
