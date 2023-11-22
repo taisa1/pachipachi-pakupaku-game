@@ -1,15 +1,19 @@
 #include "main.hpp"
 
-std::mt19937 engine;
-std::uniform_real_distribution<float> ran(-1.0f, 1.0f);
-
 void Item::init() {
+  std::random_device seed_gen;
+  engine.seed(seed_gen());
+  std::uniform_real_distribution<float> ran(-1.0f, 1.0f);
   x = ran(engine) / 2.0;
   y = (ran(engine) - 1.0) / 4.0;
-  if (ran(engine) > 0.0) {
+  float r = ran(engine);
+  std::cerr << r << std::endl;
+  if (r > 0.0) {
     type = BALL;
+    y = -abs(y);
   } else {
     type = STAR;
+    y = abs(y);
   }
 }
 void Item::drawItem() {
@@ -94,9 +98,17 @@ bool Item::checkTouching(Face &m, cv::Mat &img) {
   }
   return is_touching;
 }
-
+inline double Item::get_ground_time() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::system_clock::now() - ground_time)
+             .count() /
+         1000.0;
+}
 void Item::updatePos() {
   if (on_ground) {
+    if (get_ground_time() > 2.0) {
+      is_dead = true;
+    }
     //  y -= dt * vy;
     // vy -= dt * g;
     //   if (y < -1 || y > 1) {
@@ -107,6 +119,7 @@ void Item::updatePos() {
     if (z <= GROUND_Z) {
       std::cerr << "on_ground" << std::endl;
       on_ground = true;
+      ground_time = std::chrono::system_clock::now();
     }
   }
 }

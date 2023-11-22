@@ -36,9 +36,6 @@ void glutKeyboard(unsigned char key, int x, int y);
 void glutIdle();
 void drawBackground();
 
-extern std::mt19937 engine;
-extern std::uniform_real_distribution<float> ran;
-
 void drawOutlines(cv::Mat &img);
 
 class Face {
@@ -55,7 +52,7 @@ public:
   dlib::full_object_detection shape;
   Face()
       : center_x(0), center_y(0), is_open(false), no_detected_frame(0),
-        radius(100), eye_radius(50) {}
+        radius(50), eye_radius(30) {}
   void updatePos();
   void display(cv::Mat &img);
 };
@@ -64,14 +61,17 @@ enum ItemType { BALL, STAR };
 
 class Item {
 public:
+  std::mt19937 engine;
+
   const double GROUND_Z = 0.1;
   ItemType type;
   double x, y, z, r, vx, vy, vz, dt, g;
   int color_r, color_g, color_b, touching_frame;
   bool is_touching, is_dead, on_ground;
   double initial_x, initial_y;
+  std::chrono::system_clock::time_point ground_time;
   Item()
-      : x(0), y(-0.5), z(2.0), vy(0), vz(10.0), r(0.03), color_r(1.0),
+      : x(0), y(-0.5), z(20.0), vy(0), vz(100.0), r(0.1), color_r(1.0),
         dt(0.005), g(9.8 * 5), is_touching(false), is_dead(false),
         on_ground(false) {
     init();
@@ -79,6 +79,7 @@ public:
   void init();
   void drawItem();
   void updateY() {}
+  inline double get_ground_time();
   void up() {
     y += r;
     y = std::min(y, 1.0);

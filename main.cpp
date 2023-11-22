@@ -17,8 +17,8 @@ inline double get_time_sec() {
 
 GLuint g_TextureHandles[3] = {0, 0, 0};
 double g_angle1 = 0.0;
-double g_angle2 = -3.14 / 3;
-double g_distance = 5.0;
+double g_angle2 = 0.0;
+double g_distance = 15;
 double prev_time;
 
 Face face;
@@ -58,8 +58,7 @@ void initGL(int argc, char *argv[]) {
   glutCreateWindow(WINDOW_NAME);
 }
 void init() {
-  std::random_device seed_gen;
-  engine.seed(seed_gen());
+
   detector = dlib::get_frontal_face_detector();
   dlib::deserialize("/home/denjo/opencv/facial-landmarks-recognition/"
                     "shape_predictor_68_face_landmarks.dat") >>
@@ -134,7 +133,7 @@ void glutDisplay() {
     glLoadIdentity();
 
     gluLookAt(g_distance * cos(g_angle2) * sin(g_angle1),
-              g_distance * sin(g_angle2),
+              g_distance * sin(g_angle2) - 0.5,
               g_distance * cos(g_angle2) * cos(g_angle1), 0.0, 0.0, 0.0, 0.0,
               1.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -230,6 +229,19 @@ void drawBackground() {
 
   glEnd();
   glDisable(GL_TEXTURE_2D);
+  glBegin(GL_LINES);
+  glVertex3f(-1, -1, 0);
+  glVertex3f(-1, -1, g_distance);
+  glBegin(GL_LINES);
+  glVertex3f(1, -1, 0);
+  glVertex3f(1, -1, g_distance);
+  glBegin(GL_LINES);
+  glVertex3f(-1, 1, 0);
+  glVertex3f(-1, 1, g_distance);
+  glBegin(GL_LINES);
+  glVertex3f(1, 1, 0);
+  glVertex3f(1, 1, g_distance);
+  glEnd();
 }
 
 void drawOutlines(cv::Mat &img) {
