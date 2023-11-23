@@ -99,12 +99,23 @@ void setCallbackFunctions() {
   glutDisplayFunc(glutDisplay);
   glutKeyboardFunc(glutKeyboard);
   glutIdleFunc(glutIdle);
+  glutMouseFunc(glutMouse);
 }
-
+void glutMouse(int button, int state, int x, int y) {
+  if (button == GLUT_LEFT_BUTTON) {
+    if (state == GLUT_DOWN) {
+      if (game.state == TITLE) {
+        game.state = PLAY;
+      }
+    }
+  }
+}
 void glutKeyboard(unsigned char key, int x, int y) {
   switch (key) {
   /*case 'w':
-    item.up();
+    item.up();エフェクト
+
+スコア表示
     break;
   case 'a':
     item.left();
@@ -125,35 +136,51 @@ void glutKeyboard(unsigned char key, int x, int y) {
 char txt[20];
 
 void glutDisplay() {
-  if (game.state == State::PLAY) {
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(30.0, 1.0, 0.1, 100);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  gluPerspective(30.0, 1.0, 0.1, 100);
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
 
-    gluLookAt(g_distance * cos(g_angle2) * sin(g_angle1),
-              g_distance * sin(g_angle2) - 0.5,
-              g_distance * cos(g_angle2) * cos(g_angle1), 0.0, 0.0, 0.0, 0.0,
-              1.0, 0.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
+  gluLookAt(g_distance * cos(g_angle2) * sin(g_angle1),
+            g_distance * sin(g_angle2) - 0.5,
+            g_distance * cos(g_angle2) * cos(g_angle1), 0.0, 0.0, 0.0, 0.0, 1.0,
+            0.0);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glEnable(GL_DEPTH_TEST);
+  if (game.state == State::TITLE) {
+    glRasterPos2f(0.0, -0.3);
+    glColor3f(1.0, 1.0, 1.0);
+    drawBitmapString(GLUT_BITMAP_HELVETICA_18, "click to start");
+    glRasterPos2f(0.0, 0.3);
+    glColor3f(1.0, 1.0, 1.0);
+    drawBitmapString(GLUT_BITMAP_HELVETICA_18, "PAKUPAKU GAME");
+  } else if (game.state == State::PLAY) {
+
     drawBackground();
     for (size_t i = 0; i < game.item_id; i++) {
       item[i].drawItem();
     }
+    glRasterPos2f(-3.0, 0.0);
+    glColor3d(1.0, 1.0, 1.0);
+    char str[20];
+    sprintf(str, "score : %d", game.score);
+    drawBitmapString(GLUT_BITMAP_HELVETICA_18, str);
+    drawFullscreen();
     // drawOutlines(output_frame);
-    glFlush();
-    glDisable(GL_DEPTH_TEST);
-
-    glutSwapBuffers();
   }
   // drawBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, txt);
+  glFlush();
+
+  glDisable(GL_DEPTH_TEST);
+
+  glutSwapBuffers();
 }
 
 void glutIdle() {
-  if (game.state == State::PLAY) {
+  if (game.state == State::TITLE) {
 
+  } else if (game.state == State::PLAY) {
     cap >> frame;
     if (frame.empty()) {
       printf("no frame\n");
@@ -164,8 +191,8 @@ void glutIdle() {
     dlib::cv_image<dlib::bgr_pixel> cimg(frame);
     //   std::cerr << "loaded" << std::endl;
     std::vector<dlib::rectangle> faces = detector(cimg);
-    cv::resize(frame, frame, cv::Size(), (double)1 / 32, (double)1 / 32);
-    cv::resize(frame, frame, cv::Size(), 32, 32);
+    cv::resize(frame, frame, cv::Size(), (double)1 / 128, (double)1 / 128);
+    cv::resize(frame, frame, cv::Size(),128,128);
     //   std::cerr << "detected" << std::endl;
     if (!faces.empty()) {
       face.no_detected_frame = 0;
@@ -192,17 +219,21 @@ void glutIdle() {
     double cur_time = get_time_sec();
     if (game.item_id + 1 < Item_N && prev_time + 2.0 < cur_time) {
       prev_time += 2.0;
-      std::cerr << cur_time << std::endl;
+      std::cerr << "t = " << cur_time << ", score = " << game.score
+                << std::endl;
       game.item_id++;
     }
     for (int i = 0; i < game.item_id; i++) {
-      item[i].checkTouching(face, frame);
+      item[i].checkTouching(face, frame, game);
     }
     glBindTexture(GL_TEXTURE_2D, g_TextureHandles[0]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.cols, frame.rows, 0, GL_BGR,
                  GL_UNSIGNED_BYTE, frame.data);
     // int k = cv::waitKey(33);
     sprintf(txt, "item_id = %ld", game.item_id);
+    if (game.color_a > 0.0) {
+      game.color_a = std::max(0.0, game.color_a - 0.06);
+    }
   } else if (game.state == State::RESULT) {
     //  std::cerr << "result" << std::endl;
   }
@@ -260,4 +291,23 @@ void drawOutlines(cv::Mat &img) {
       }
     }
   }
+}
+
+void drawFullscreen() {
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glDisable(GL_DEPTH_TEST); // 深度テストを無効化
+  glColor4f(game.color_r, game.color_g, game.color_b, game.color_a);
+  glBegin(GL_POLYGON);
+  // glColor3d(1.0, 0.0, 0.0);
+  glVertex3d(-1.0, -1.0, 14);
+  // glColor3d(1.0, 1.0, 0.0);
+  glVertex3d(1.0, -1.0, 14);
+  // glColor3d(0.0, 1.0, 1.0);
+  glVertex3d(1.0, 1.0, 14);
+  // glColor3d(0.0, 0.0, 0.0);
+  glVertex3d(-1.0, 1.0, 14);
+  glEnd();
+  glEnable(GL_DEPTH_TEST); // 描画後に深度テストを有効化
+  glDisable(GL_BLEND);
 }

@@ -16,11 +16,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define WINDOW_X (800)
-#define WINDOW_Y (600)
+#define WINDOW_X (1200)
+#define WINDOW_Y (900)
 #define WINDOW_NAME "game"
-#define TEXTURE_HEIGHT (800)
-#define TEXTURE_WIDTH (600)
+#define TEXTURE_HEIGHT (1200)
+#define TEXTURE_WIDTH (900)
 #define FRAME_WIDTH 640
 #define FRAME_HEIGHT 480
 #define FRAME_RATE 30
@@ -33,10 +33,27 @@ void setCallbackFunctions();
 
 void glutDisplay();
 void glutKeyboard(unsigned char key, int x, int y);
+void glutMouse(int button, int state, int x, int y);
 void glutIdle();
 void drawBackground();
+void drawFullscreen();
 
 void drawOutlines(cv::Mat &img);
+enum State { TITLE, PLAY, RESULT };
+
+class gameState {
+public:
+  size_t item_id;
+  int score;
+  State state;
+  const int eye_score = 100;
+  const int mouth_close_score = 20;
+  const int mouth_open_score = 100;
+  float color_r, color_b, color_g, color_a;
+  gameState()
+      : item_id(0), state(State::TITLE), score(0), color_r(0), color_g(0),
+        color_a(0) {}
+};
 
 class Face {
 public:
@@ -67,13 +84,13 @@ public:
   ItemType type;
   double x, y, z, r, vx, vy, vz, dt, g;
   int color_r, color_g, color_b, touching_frame;
-  bool is_touching, is_dead, on_ground;
+  bool is_touching, is_dead, on_ground, is_scored;
   double initial_x, initial_y;
   std::chrono::system_clock::time_point ground_time;
   Item()
       : x(0), y(-0.5), z(20.0), vy(0), vz(100.0), r(0.1), color_r(1.0),
         dt(0.005), g(9.8 * 5), is_touching(false), is_dead(false),
-        on_ground(false) {
+        is_scored(false), on_ground(false) {
     init();
   }
   void init();
@@ -97,7 +114,7 @@ public:
     x = std::max(x, -1.0);
   }
   bool checkTouching(cv::Mat &img);
-  bool checkTouching(Face &m, cv::Mat &img);
+  bool checkTouching(Face &m, cv::Mat &img, gameState &game);
   void updateColor() {
     if (is_touching) {
       color_r = 0.0;
@@ -106,16 +123,6 @@ public:
     }
   }
   void updatePos();
-};
-
-enum State { TITLE, PLAY, RESULT };
-
-class gameState {
-public:
-  size_t item_id;
-  int score;
-  State state;
-  gameState() : item_id(0), state(State::PLAY), score(0) {}
 };
 
 #define MAIN_HPP

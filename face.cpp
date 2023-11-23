@@ -1,4 +1,5 @@
 #include "main.hpp"
+
 void Face::updatePos() {
 
   center_x = 0;
@@ -76,6 +77,8 @@ void Face::display(cv::Mat &img) {
    -1);
    }*/
   // std::cerr << is_open << std::endl;
+  img.setTo(cv::Scalar(0, 0, 0));
+
   cv::circle(img, cv::Point(center_x, center_y), radius,
              is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), -1);
   cv::circle(img, cv::Point(eyel_center_x, eyel_center_y), eye_radius,

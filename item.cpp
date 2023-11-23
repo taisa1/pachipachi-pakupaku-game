@@ -63,7 +63,7 @@ bool Item::checkTouching(cv::Mat &img) {
   }
   return is_touching;
 }
-bool Item::checkTouching(Face &m, cv::Mat &img) {
+bool Item::checkTouching(Face &m, cv::Mat &img, gameState &game) {
   if (!on_ground)
     return false;
   is_touching = false;
@@ -73,18 +73,50 @@ bool Item::checkTouching(Face &m, cv::Mat &img) {
       ny <= m.center_y + m.radius && m.center_x - m.radius <= nx &&
       nx <= m.center_x + m.radius) {
     is_touching = true;
+    if (!is_scored) {
+      if (m.is_open) {
+        game.color_r = 0;
+        game.color_g = 1;
+        game.color_b = 0;
+        game.color_a = 0.5;
+        game.score += game.mouth_open_score;
+      } else {
+        game.color_r = 1;
+        game.color_g = 0;
+        game.color_b = 0;
+        game.color_a = 0.5;
+        game.score += game.mouth_close_score;
+      }
+      is_scored = true;
+    }
   }
   if (type == STAR) {
     if (m.eyel_center_y - m.eye_radius <= ny &&
         ny <= m.eyel_center_y + m.eye_radius &&
         m.eyel_center_x - m.eye_radius <= nx &&
         nx <= m.eyel_center_x + m.eye_radius) {
+      if (!is_scored) {
+        game.color_r = 1;
+        game.color_g = 1;
+        game.color_b = 0;
+        game.color_a = 0.5;
+        game.score += game.eye_score;
+        is_scored = true;
+      }
       is_touching = true;
     }
     if (m.eyer_center_y - m.eye_radius <= ny &&
         ny <= m.eyer_center_y + m.eye_radius &&
         m.eyer_center_x - m.eye_radius <= nx &&
         nx <= m.eyer_center_x + m.eye_radius) {
+      if (!is_scored) {
+        game.color_r = 1;
+        game.color_g = 1;
+        game.color_b = 0;
+        game.color_a = 0.5;
+        game.score += game.eye_score;
+        is_scored = true;
+      }
       is_touching = true;
     }
   }
