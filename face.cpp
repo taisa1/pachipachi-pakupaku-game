@@ -1,5 +1,12 @@
 #include "main.hpp"
-
+double dist(dlib::point &p1, dlib::point &p2) {
+  return std::sqrt((p1.x() - p2.x()) * (p1.x() - p2.x()) +
+                   (p1.y() - p2.y()) * (p1.y() - p2.y()));
+}
+double calcEar(dlib::point &p1, dlib::point &p2, dlib::point &p3,
+               dlib::point &p4, dlib::point &p5, dlib::point &p6) {
+  return (dist(p2, p6) + dist(p3, p5)) / 2.0 / dist(p1, p4);
+}
 void Face::updatePos() {
 
   center_x = 0;
@@ -39,53 +46,59 @@ void Face::updatePos() {
   }
   eyer_center_x /= right_eye.size();
   eyer_center_y /= right_eye.size();
-  int upperMouthMax = -100000000;
-  int lowerMouthMin = 10000000;
-  int upperMouthMin = 100000000;
-  int lowerMouthMax = -100000000;
-
-  for (int i : upper_mouth) {
-    // upperMouthMean += shape.part(i).y();
-    upperMouthMax = std::max(upperMouthMax, (int)(shape.part(i).y()));
-    upperMouthMin = std::min(upperMouthMin, (int)(shape.part(i).y()));
+  bool mouthopen =
+      calcEar(shape.part(60), shape.part(61), shape.part(63), shape.part(64),
+              shape.part(65), shape.part(67)) > 0.2;
+  if (is_mouthopen != mouthopen) {
+    mouth_count++;
+    is_mouthopen = mouthopen;
   }
-
-  for (int i : lower_mouth) {
-    lowerMouthMin = std::min(lowerMouthMin, (int)(shape.part(i).y()));
-    lowerMouthMax = std::max(lowerMouthMax, (int)(shape.part(i).y()));
+  bool lefteyeopen =
+      calcEar(shape.part(36), shape.part(37), shape.part(38), shape.part(39),
+              shape.part(40), shape.part(41)) > 0.2;
+  if (is_lefteyeopen != lefteyeopen) {
+    lefteye_count++;
+    is_lefteyeopen = lefteyeopen;
   }
-
-  // upperMouthMean /= upper_mouth.size();
-  // lowerMouthMean /= lower_mouth.size();
-  is_open = std::fabs((float)(lowerMouthMin - upperMouthMax) /
-                      (float)(lowerMouthMax - upperMouthMin)) > 0.1;
+  bool righteyeopen =
+      calcEar(shape.part(42), shape.part(43), shape.part(44), shape.part(45),
+              shape.part(46), shape.part(47)) > 0.2;
+  if (is_righteyeopen != righteyeopen) {
+    righteye_count++;
+    is_righteyeopen = righteyeopen;
+  }
 }
 
 void Face::display(cv::Mat &img) {
-  /* for (int i : upper_mouth) {
-     int x = shape.part(i).x();
-     int y = shape.part(i).y();
-     cv::circle(img, cv::Point(x, y), 2,
-                is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255),
-   -1);
-   }
-   for (int i : lower_mouth) {
-     int x = shape.part(i).x();
-     int y = shape.part(i).y();
-     cv::circle(img, cv::Point(x, y), 2,
-                is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255),
-   -1);
-   }*/
-  // std::cerr << is_open << std::endl;
-  img.setTo(cv::Scalar(0, 0, 0));
 
-  cv::circle(img, cv::Point(center_x, center_y), radius,
-             is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), -1);
-  cv::circle(img, cv::Point(eyel_center_x, eyel_center_y), eye_radius,
-             cv::Scalar(0, 255, 255), -1);
-  cv::circle(img, cv::Point(eyer_center_x, eyer_center_y), eye_radius,
-             cv::Scalar(0, 255, 255), -1);
-  /*cv::putText(img, is_open ? "Mouth Open" : "Mouth Closed",
+  // std::cerr << is_mouthope << std::endl;
+  img.setTo(cv::Scalar(0, 0, 0));
+  cv::Scalar mouth_color = cv::Scalar(90, 200, 0);
+  if (is_mouthopen) {
+    cv::circle(img, cv::Point(center_x, center_y), radius, mouth_color, -1);
+  } else {
+    cv::line(img, cv::Point(center_x - radius / 2, center_y),
+             cv::Point(center_x + radius / 2, center_y), mouth_color, 5);
+  }
+  cv::Scalar eye_color = cv::Scalar(0, 200, 200);
+  if (is_lefteyeopen) {
+    cv::circle(img, cv::Point(eyel_center_x, eyel_center_y), eye_radius,
+               eye_color, -1);
+  } else {
+    cv::line(img, cv::Point(eyel_center_x - eye_radius / 2, eyel_center_y),
+             cv::Point(eyel_center_x + eye_radius / 2, eyel_center_y),
+             eye_color, 5);
+  }
+  if (is_righteyeopen) {
+    cv::circle(img, cv::Point(eyer_center_x, eyer_center_y), eye_radius,
+               eye_color, -1);
+  } else {
+    cv::line(img, cv::Point(eyer_center_x - eye_radius / 2, eyer_center_y),
+             cv::Point(eyer_center_x + eye_radius / 2, eyer_center_y),
+             eye_color, 5);
+  }
+  /*cv::putText(img, is_mouthopen ? "Mouth Open" : "Mouth Closed",
               cv::Point(50, 50), cv::FONT_HERSHEY_SIMPLEX, 1,
-              is_open ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255), 2);*/
+              is_mouthopen ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255),
+     2);*/
 }

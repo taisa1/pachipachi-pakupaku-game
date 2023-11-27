@@ -7,7 +7,7 @@ void Item::init() {
   x = ran(engine) / 2.0;
   y = (ran(engine) - 1.0) / 4.0;
   float r = ran(engine);
-  std::cerr << r << std::endl;
+ // std::cerr << r << std::endl;
   if (r > 0.0) {
     type = BALL;
     y = -abs(y);
@@ -66,28 +66,31 @@ bool Item::checkTouching(cv::Mat &img) {
 bool Item::checkTouching(Face &m, cv::Mat &img, gameState &game) {
   if (!on_ground)
     return false;
+  if (is_dead) {
+    return false;
+  }
   is_touching = false;
   int ny = static_cast<int>((1.0 - y) * img.rows / 2.0);
   int nx = static_cast<int>((1.0 + x) * img.cols / 2.0);
-  if (type == BALL && m.center_y - m.radius <= ny &&
-      ny <= m.center_y + m.radius && m.center_x - m.radius <= nx &&
-      nx <= m.center_x + m.radius) {
-    is_touching = true;
-    if (!is_scored) {
-      if (m.is_open) {
-        game.color_r = 0;
-        game.color_g = 1;
-        game.color_b = 0;
-        game.color_a = 0.5;
-        game.score += game.mouth_open_score;
-      } else {
-        game.color_r = 1;
-        game.color_g = 0;
-        game.color_b = 0;
-        game.color_a = 0.5;
-        game.score += game.mouth_close_score;
+  if (type == BALL) {
+    if (m.center_y - m.radius <= ny && ny <= m.center_y + m.radius &&
+        m.center_x - m.radius <= nx && nx <= m.center_x + m.radius) {
+      is_touching = true;
+      if (!is_scored) {
+        if (mouth_ready) {
+          if (m.mouth_count - prev_mouth_count >= 2) {
+            game.color_r = 0;
+            game.color_g = 1;
+            game.color_b = 0;
+            game.color_a = 0.5;
+            game.score += game.mouth_open_score;
+            is_scored = true;
+          }
+        } else {
+          mouth_ready = true;
+          prev_mouth_count = m.mouth_count;
+        }
       }
-      is_scored = true;
     }
   }
   if (type == STAR) {
@@ -95,34 +98,48 @@ bool Item::checkTouching(Face &m, cv::Mat &img, gameState &game) {
         ny <= m.eyel_center_y + m.eye_radius &&
         m.eyel_center_x - m.eye_radius <= nx &&
         nx <= m.eyel_center_x + m.eye_radius) {
-      if (!is_scored) {
-        game.color_r = 1;
-        game.color_g = 1;
-        game.color_b = 0;
-        game.color_a = 0.5;
-        game.score += game.eye_score;
-        is_scored = true;
-      }
       is_touching = true;
+      if (!is_scored) {
+        if (lefteye_ready) {
+          if (m.lefteye_count - prev_lefteye_count >= 2) {
+            game.color_r = 1;
+            game.color_g = 1;
+            game.color_b = 0;
+            game.color_a = 0.5;
+            game.score += game.eye_score;
+            is_scored = true;
+          }
+        } else {
+          lefteye_ready = true;
+          prev_lefteye_count = m.lefteye_count;
+        }
+      }
     }
     if (m.eyer_center_y - m.eye_radius <= ny &&
         ny <= m.eyer_center_y + m.eye_radius &&
         m.eyer_center_x - m.eye_radius <= nx &&
         nx <= m.eyer_center_x + m.eye_radius) {
-      if (!is_scored) {
-        game.color_r = 1;
-        game.color_g = 1;
-        game.color_b = 0;
-        game.color_a = 0.5;
-        game.score += game.eye_score;
-        is_scored = true;
-      }
       is_touching = true;
+      if (!is_scored) {
+        if (lefteye_ready) {
+          if (m.lefteye_count - prev_lefteye_count >= 2) {
+            game.color_r = 1;
+            game.color_g = 1;
+            game.color_b = 0;
+            game.color_a = 0.5;
+            game.score += game.eye_score;
+            is_scored = true;
+          }
+        } else {
+          lefteye_ready = true;
+          prev_lefteye_count = m.lefteye_count;
+        }
+      }
     }
   }
   if (is_touching) {
     touching_frame++;
-    if (touching_frame >= 5) {
+    if (is_scored) {
       is_dead = true;
     }
   } else {
@@ -138,7 +155,7 @@ inline double Item::get_ground_time() {
 }
 void Item::updatePos() {
   if (on_ground) {
-    if (get_ground_time() > 2.0) {
+    if (get_ground_time() > 1.5) {
       is_dead = true;
     }
     //  y -= dt * vy;
@@ -149,7 +166,7 @@ void Item::updatePos() {
   } else {
     z -= dt * vz;
     if (z <= GROUND_Z) {
-      std::cerr << "on_ground" << std::endl;
+     // std::cerr << "on_ground" << std::endl;
       on_ground = true;
       ground_time = std::chrono::system_clock::now();
     }

@@ -19,18 +19,21 @@ GLuint g_TextureHandles[3] = {0, 0, 0};
 double g_angle1 = 0.0;
 double g_angle2 = 0.0;
 double g_distance = 15;
-double prev_time;
+double prev_time, end_time;
+;
 
 Face face;
 Item item[Item_N];
 gameState game;
+bool is_end;
 
 void drawBitmapString(void *font, char *string) {
   glPushAttrib(GL_CURRENT_BIT);
 
   /* ビットマップ文字列の描画 */
-  while (*string)
+  while (*string) {
     glutBitmapCharacter(font, *string++);
+  }
 
   glPopAttrib();
 }
@@ -58,7 +61,7 @@ void initGL(int argc, char *argv[]) {
   glutCreateWindow(WINDOW_NAME);
 }
 void init() {
-
+  is_end = false;
   detector = dlib::get_frontal_face_detector();
   dlib::deserialize("/home/denjo/opencv/facial-landmarks-recognition/"
                     "shape_predictor_68_face_landmarks.dat") >>
@@ -91,8 +94,6 @@ void init() {
    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, output_frame.cols,
    output_frame.rows, 0, GL_BGR, GL_UNSIGNED_BYTE, output_frame.data);*/
   // set_texture();
-  start = std::chrono::system_clock::now();
-  prev_time = get_time_sec();
 }
 
 void setCallbackFunctions() {
@@ -106,6 +107,8 @@ void glutMouse(int button, int state, int x, int y) {
     if (state == GLUT_DOWN) {
       if (game.state == TITLE) {
         game.state = PLAY;
+        start = std::chrono::system_clock::now();
+        prev_time = get_time_sec();
       }
     }
   }
@@ -154,20 +157,30 @@ void glutDisplay() {
     drawBitmapString(GLUT_BITMAP_HELVETICA_18, "click to start");
     glRasterPos2f(0.0, 0.3);
     glColor3f(1.0, 1.0, 1.0);
-    drawBitmapString(GLUT_BITMAP_HELVETICA_18, "PAKUPAKU GAME");
+    drawBitmapString(GLUT_BITMAP_HELVETICA_18, "PACHIPACHI PAKUPAKU GAME");
   } else if (game.state == State::PLAY) {
 
     drawBackground();
-    for (size_t i = 0; i < game.item_id; i++) {
-      item[i].drawItem();
-    }
     glRasterPos2f(-3.0, 0.0);
     glColor3d(1.0, 1.0, 1.0);
     char str[20];
     sprintf(str, "score : %d", game.score);
     drawBitmapString(GLUT_BITMAP_HELVETICA_18, str);
+    for (size_t i = 0; i < game.item_id; i++) {
+      item[i].drawItem();
+    }
+
     drawFullscreen();
     // drawOutlines(output_frame);
+  } else if (game.state == State::RESULT) {
+    glRasterPos2f(0.0, -0.3);
+    glColor3f(1.0, 1.0, 1.0);
+    drawBitmapString(GLUT_BITMAP_HELVETICA_18, "Thank you for playing!");
+    glRasterPos2f(0.0, 0.3);
+    glColor3f(1.0, 1.0, 1.0);
+    char str[20];
+    sprintf(str, "your score : %d", game.score);
+    drawBitmapString(GLUT_BITMAP_HELVETICA_18, str);
   }
   // drawBitmapString(GLUT_BITMAP_TIMES_ROMAN_24, txt);
   glFlush();
@@ -192,7 +205,7 @@ void glutIdle() {
     //   std::cerr << "loaded" << std::endl;
     std::vector<dlib::rectangle> faces = detector(cimg);
     cv::resize(frame, frame, cv::Size(), (double)1 / 128, (double)1 / 128);
-    cv::resize(frame, frame, cv::Size(),128,128);
+    cv::resize(frame, frame, cv::Size(), 128, 128);
     //   std::cerr << "detected" << std::endl;
     if (!faces.empty()) {
       face.no_detected_frame = 0;
@@ -233,6 +246,22 @@ void glutIdle() {
     sprintf(txt, "item_id = %ld", game.item_id);
     if (game.color_a > 0.0) {
       game.color_a = std::max(0.0, game.color_a - 0.06);
+    }
+    if (game.item_id == Item_N - 1) {
+      int dead_count = 0;
+      for (int i = 0; i < game.item_id; i++) {
+        dead_count += (item[i].is_dead);
+      }
+      if (dead_count == Item_N - 1) {
+        if (!is_end) {
+          end_time = get_time_sec();
+          is_end = true;
+        } else {
+          if (cur_time - end_time > 2.0) {
+            game.state = State::RESULT;
+          }
+        }
+      }
     }
   } else if (game.state == State::RESULT) {
     //  std::cerr << "result" << std::endl;

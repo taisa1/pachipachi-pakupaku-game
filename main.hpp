@@ -64,12 +64,14 @@ public:
   const std::vector<int> right_eye = {42, 43, 44, 45, 46, 47};
   float center_x, center_y, radius, eyel_center_x, eyer_center_x, eyel_center_y,
       eyer_center_y, eye_radius;
-  bool is_open;
+  bool is_mouthopen, is_lefteyeopen, is_righteyeopen;
+  int mouth_count, lefteye_count, righteye_count;
   int no_detected_frame;
   dlib::full_object_detection shape;
   Face()
-      : center_x(0), center_y(0), is_open(false), no_detected_frame(0),
-        radius(50), eye_radius(30) {}
+      : center_x(0), center_y(0), is_mouthopen(false), is_lefteyeopen(false),
+        is_righteyeopen(false), no_detected_frame(0), radius(50),
+        eye_radius(30), mouth_count(0), lefteye_count(0), righteye_count(0) {}
   void updatePos();
   void display(cv::Mat &img);
 };
@@ -84,12 +86,16 @@ public:
   ItemType type;
   double x, y, z, r, vx, vy, vz, dt, g;
   int color_r, color_g, color_b, touching_frame;
+  int prev_mouth_count, prev_lefteye_count, prev_righteye_count;
   bool is_touching, is_dead, on_ground, is_scored;
+  bool mouth_ready, lefteye_ready, righteye_ready;
   double initial_x, initial_y;
   std::chrono::system_clock::time_point ground_time;
   Item()
       : x(0), y(-0.5), z(20.0), vy(0), vz(100.0), r(0.1), color_r(1.0),
         dt(0.005), g(9.8 * 5), is_touching(false), is_dead(false),
+        mouth_ready(false), lefteye_ready(false), righteye_ready(false),
+        prev_mouth_count(0), prev_lefteye_count(0), prev_righteye_count(0),
         is_scored(false), on_ground(false) {
     init();
   }
